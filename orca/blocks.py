@@ -12,7 +12,7 @@ def spe(lines, i=0):
     if i is None:
         return output
     i += spe.header
-    vals = utils.extract_numbers(lines[i])
+    vals = utils._extract_numbers(lines[i])
     output.append(vals[-1])
     return output
 
@@ -24,7 +24,7 @@ def orbitals(lines, i=0):
         return output
     i += orbitals.header
     while i < len(lines) and not orbitals.endpoint(lines[i]):
-        vals = utils.extract_numbers(lines[i])
+        vals = utils._extract_numbers(lines[i])
         if vals[1] > 0:
             output['occupied'].append(vals[2])
         else:
@@ -41,7 +41,7 @@ def mulliken(lines, i=0):
         return output
     i += mulliken.header
     while i < len(lines) and not mulliken.endpoint(lines[i]):
-        vals = utils.extract_numbers(lines[i])
+        vals = utils._extract_numbers(lines[i])
         output.append(vals[-1])
         i += 1
     return output
@@ -54,7 +54,7 @@ def loewdin(lines, i=0):
         return output
     i += loewdin.header
     while i < len(lines) and not loewdin.endpoint(lines[i]):
-        vals = utils.extract_numbers(lines[i])
+        vals = utils._extract_numbers(lines[i])
         output.append(vals[-1])
         i += 1
     return output
@@ -67,7 +67,7 @@ def mayer(lines, i=0):
         return output
     i += mayer.header
     while i < len(lines) and not mayer.endpoint(lines[i]):
-        vals = utils.extract_numbers(lines[i])
+        vals = utils._extract_numbers(lines[i])
         output['total_valence'].append(vals[-3])
         output['bonded_valence'].append(vals[-2])
         output['free_valence'].append(vals[-1])
@@ -82,7 +82,7 @@ def hirshfeld(lines, i=0):
         return output
     i += hirshfeld.header
     while i < len(lines) and not hirshfeld.endpoint(lines[i]):
-        vals = utils.extract_numbers(lines[i])
+        vals = utils._extract_numbers(lines[i])
         if len(vals) >= 2:
             output['charge'].append(vals[-2])
             output['spin'].append(vals[-1])
@@ -98,7 +98,7 @@ def npa(lines, i=0):
         return output
     i += npa.header
     while i < len(lines) and not npa.endpoint(lines[i]):
-        vals = utils.extract_numbers(lines[i])
+        vals = utils._extract_numbers(lines[i])
         output['charge'].append(vals[-5])
         output['core'].append(vals[-4])
         output['valence'].append(vals[-3])
@@ -110,8 +110,7 @@ def npa(lines, i=0):
 @utils.block(tags='NATURAL BOND ORBITALS (Summary):', key='NBO', header=1,
        endpoint=utils._contains('NBO analysis completed'))
 def nbo(lines, i=0):
-    output = {'atom': {'CR': {}, 'LP': {}, 'LV': {}, 'RY': {}},
-              'bond': {'BD': {}, 'BD*': {}}}
+    output = []
     i, _ = utils._seek_tag(lines, nbo.tags, start=i)
     if i is None:
         return output
@@ -120,22 +119,26 @@ def nbo(lines, i=0):
         line = lines[i]
         m = utils._NBO_RE.match(line)
         if m:
+            idx = int(line.strip().split('.')[0])  # orbital index
             typ = m.group('type')
             order = int(m.group('order'))
             occ = utils._safe_float(m.group('occ'))
             ene = utils._safe_float(m.group('E'))
             a1 = int(m.group('a1'))
             a2 = m.group('a2')
-            if a2 is None:
-                key = (a1,)
-                target = 'atom'
-            else:
-                key = (a1, int(a2))
-                target = 'bond'
-            d = output[target][typ].setdefault(order, {})
-            d[key] = {'occupancy': occ, 'energy': ene}
+            a2 = int(a2) if a2 is not None else None
+            
+            output.append({
+                'index': idx,
+                'atom1': a1,
+                'atom2': a2,
+                'type': typ,
+                'order': order,
+                'occ': occ,
+                'energy': ene
+            })
         i += 1
-    return output
+    return pd.DataFrame(output).set_index('index')
 
 @utils.block(tags='DIPOLE MOMENT', key='Dipole', endpoint=utils._contains('Magnitude (Debye)'))
 def dipole(lines, i=0):
@@ -146,11 +149,11 @@ def dipole(lines, i=0):
     i += dipole.header
     while i < len(lines) and not dipole.endpoint(lines[i]):
         if 'Total Dipole Moment' in lines[i]:
-            vals = utils.extract_numbers(lines[i])
+            vals = utils._extract_numbers(lines[i])
             if len(vals) >= 3:
                 output['vector'] = tuple(vals[:3])
         i += 1
-    vals = utils.extract_numbers(lines[i])
+    vals = utils._extract_numbers(lines[i])
     if vals:
         output['magnitude'] = vals[0]
     return output
@@ -164,11 +167,11 @@ def rotational_constants(lines, i=0):
     i += rotational_constants.header
     while i < len(lines) and not rotational_constants.endpoint(lines[i]):
         if 'Rotational constants in cm-1' in lines[i]:
-            vals = utils.extract_numbers(lines[i])
+            vals = utils._extract_numbers(lines[i])
             if vals:
                 output['cm-1'] = tuple(vals)
         i += 1
-    vals = utils.extract_numbers(lines[i])
+    vals = utils._extract_numbers(lines[i])
     if vals:
         output['MHz'] = tuple(vals)
     return output
@@ -181,7 +184,7 @@ def ir_spectra(lines, i=0):
         return output
     i += ir_spectra.header
     while i < len(lines) and not ir_spectra.endpoint(lines[i]):
-        vals = utils.extract_numbers(lines[i])
+        vals = utils._extract_numbers(lines[i])
         output.append(vals[0])
         i += 1
     return utils.parse_ir(output)
@@ -211,7 +214,7 @@ def energies(lines, i=0, conv=True, const='kcal/mol'):
     while i < len(lines):
         for k in output:
             if k in lines[i]:
-                vals = utils.extract_numbers(lines[i])
+                vals = utils._extract_numbers(lines[i])
                 if vals:
                     output[k] = vals[0]
         i += 1
