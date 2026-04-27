@@ -6,8 +6,8 @@ from . import blocks
 
 class OrcaParser:
     def __init__(self, file_path):
-        self.file_path = _parse_path(file_path)
-        self._lines = _read_lines(self.file_path)
+        self.file_path = utils._parse_path(file_path)
+        self._lines = utils._read_lines(self.file_path)
     
         self._cache = set()
         self._behavior_overrides = {}
@@ -31,7 +31,7 @@ class OrcaParser:
             mode = self._behavior_overrides.get(key, func.mode)
             i = 0
             while True:
-                i, _ = _seek_tag(self._lines, func.tags, start=i)
+                i, _ = utils._seek_tag(self._lines, func.tags, start=i)
                 if i is None:
                     break
                 result = func(self._lines, i=i)
