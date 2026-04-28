@@ -223,3 +223,17 @@ def energies(lines, i=0, conv=True, const='kcal/mol'):
         if all(v is not None for v in output.values()):
             return utils.parse_energies(output, conv=conv)
     return utils.parse_energies(output, conv=conv, const=const)
+
+@utils.block(tags='TOTAL RUN TIME:', key='Time')
+def walltime(lines, i=0, unit='s'):
+    i, _ = utils._seek_tag(lines, walltime.tags, start=i)
+    if i is None:
+        return None
+    d, h, m, s, ms = utils._extract_numbers(lines[i])
+    time = (d * 86400 +
+            h * 3600 +
+            m * 60 +
+            s +
+            ms / 1000)
+    
+    return time * utils._TIME_TO[unit]

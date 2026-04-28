@@ -9,7 +9,13 @@ _EH_TO = {'kcal/mol': 627.50961,
           'kJ/mol': 2625.5002,
           'eV': 27.211399,
           'cm-1': 219474.63,
-          'hartree': 1.00000}
+          'hartree': 1}
+
+_TIME_TO = {'s': 1,
+            'ms': 1000,
+            'min': 1/60,
+            'h': 1/3600,
+            'd': 1/86400}
 
 # --------------- patterns --------------- #
 # _FLOAT_RE = re.compile(r'[-]?[0-9]+\.+[0-9]+') # Old version I was using...
@@ -122,7 +128,7 @@ def block(tags, key, header=0, endpoint=_blank, multiple=False, mode='last'):
     return wrapper
  
 # --------------- parsers --------------- #
-def parse_energies(energies, conv=True, const='kcal/mol'):
+def parse_energies(energies, unit='kcal/mol'):
     parsed = {'energies': {'EE': energies['Electronic energy'],
                            'ZPE': (energies['Electronic energy'] + energies['Zero point energy']
                                    if energies['Electronic energy'] is not None
@@ -144,11 +150,10 @@ def parse_energies(energies, conv=True, const='kcal/mol'):
                               'Translational entropy': energies['Translational entropy']}
              }
     
-    if conv:
-        for p in parsed:
-            parsed[p] = {k: (v * _EH_TO[const] if v is not None else None)
-                         for k, v in parsed[p].items()}
-    
+    for p in parsed:
+        parsed[p] = {k: (v * _EH_TO[unit] if v is not None else None)
+                     for k, v in parsed[p].items()}
+
     return parsed
 
 def parse_ir(ir_spectra, eps=1e-3):
@@ -176,5 +181,4 @@ def load_json_dataframe(path):
     for json_file in Path(path).glob('*.json'):
         with json_file.open() as f:
             rows[json_file.stem] = json.load(f)
-
     return pd.DataFrame.from_dict(rows, orient="index")
