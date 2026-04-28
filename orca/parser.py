@@ -48,12 +48,13 @@ class OrcaParser:
         self._behavior_overrides[key] = mode
 
     def get_nbo(self, typ=None, order=None, atom1=None, atom2=None,
-                occ=None, energy=None,
-                return_occ=False, return_energy=False):
-
+                occ=None, energy=None, return_occ=False, return_energy=False, sort_by=None):
+        
         df = self.get_property('NBO')
         if df is None or df.empty:
             return df
+        if sort_by is not None:
+            out = df.sort_values(by=sort_by)
         out = df
         # ---- filters ----
         if typ is not None:
@@ -82,6 +83,9 @@ class OrcaParser:
             cols.append('energy')
         if cols:
             return out[cols] if len(cols) > 1 else out[cols[0]]
+        # ----- check: if empty -> None
+        if out is None or out.empty:
+            return None
         return out
     
     def _build_maps(self):

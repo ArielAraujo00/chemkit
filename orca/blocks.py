@@ -9,13 +9,13 @@ from . import utils
 # ----- orca parser blocks -----
 @utils.block(tags='FINAL SINGLE POINT ENERGY', key='SPE', multiple=True)
 def spe(lines, i=0):
-    output = []
+    output = None
     i, _ = utils._seek_tag(lines, spe.tags, start=i)
     if i is None:
         return output
     i += spe.header
     vals = utils._extract_numbers(lines[i])
-    output.append(vals[-1])
+    output = vals[-1]
     return output
 
 @utils.block(tags='ORBITAL ENERGIES', key='MO', header=4, endpoint=utils._not_digit)
@@ -126,9 +126,9 @@ def nbo(lines, i=0):
             order = int(m.group('order'))
             occ = utils._safe_float(m.group('occ'))
             ene = utils._safe_float(m.group('E'))
-            a1 = int(m.group('a1'))
+            a1 = int(m.group('a1')) -1  # Adjust for orca index
             a2 = m.group('a2')
-            a2 = int(a2) if a2 is not None else None
+            a2 = int(a2) -1 if a2 is not None else None  # Adjust for orca index
             
             output.append({
                 'index': idx,
@@ -171,7 +171,7 @@ def rotational_constants(lines, i=0):
         if 'Rotational constants in cm-1' in lines[i]:
             vals = utils._extract_numbers(lines[i])
             if vals:
-                output['cm-1'] = tuple(vals)
+                output['cm-1'] = tuple(vals[1:])
         i += 1
     vals = utils._extract_numbers(lines[i])
     if vals:
