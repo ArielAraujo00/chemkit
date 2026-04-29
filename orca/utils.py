@@ -176,9 +176,11 @@ def load_json(path):
     with path.open("r") as f:
         return json.load(f)
 
-def load_json_dataframe(path):
-    rows = {}
-    for json_file in Path(path).glob('*.json'):
-        with json_file.open() as f:
-            rows[json_file.stem] = json.load(f)
-    return pd.DataFrame.from_dict(rows, orient="index")
+def load_descriptor_dataframe(path):
+    json_files = list(Path(path).glob('*.json'))
+    def _rows():  # Build from generator -> no need to load all files into memory
+        for file in tqdm(json_files, total=len(json_files)):
+            data = load_json(file)
+            data['__index__'] = file.stem
+            yield data
+    return pd.DataFrame(_rows()).set_index('__index__')
