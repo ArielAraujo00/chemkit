@@ -5,12 +5,12 @@ import pandas as pd
 from chemkit.orca import OrcaParser
 from chemkit.orca.utils import dump_json
 
-def orca_wrapper(output_path, core_idx, file_id=None, bkp_path=None, overwrite_bkp=False):
+def orca_wrapper(output_path, core_atoms, file_id=None, bkp_path=None, overwrite_bkp=False):
     amide_reference = '[#7X3]([#1,#6])([#1,#6])[#6X3](=[#8X1])[#6]'  # Amide SMARTS // Amide Chemspace Project
-    smarts_idx = {'N': 0, 'C': 3, 'O': 4, 'R1': 5, 'R2': 1, 'R3': 2}  # Amide atom index from SMARTS != core_idx
+    smarts_idx = {'N': 0, 'C': 3, 'O': 4, 'R1': 5, 'R2': 1, 'R3': 2}  # Amide atom index from SMARTS != core_atoms
     
     # main mapper -> core atoms and its respective labels
-    label_map = {core_idx[v]: k for k, v in smarts_idx.items()}
+    label_map = {core_atoms[v]: k for k, v in smarts_idx.items()}
 
     # Start parser and main variables
     op = OrcaParser(output_path)
@@ -60,7 +60,7 @@ def orca_wrapper(output_path, core_idx, file_id=None, bkp_path=None, overwrite_b
             results[f'NPA_Total_{atom}'] = op.NPA['total'][idx]
     
     # NBO - Atom and Bond Based Descriptors
-    nbo_data = op.get_nbo(atom1=list(core_idx), typ=['LP', 'LV', 'BD', 'BD*'])
+    nbo_data = op.get_nbo(atom1=list(core_atoms), typ=['LP', 'LV', 'BD', 'BD*'])
     if nbo_data is not None:
         for row in nbo_data.itertuples(index=False):
             l1 = label_map.get(row.atom1)
