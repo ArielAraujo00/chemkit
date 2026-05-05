@@ -39,6 +39,15 @@ def orca_wrapper(output_path, core_atoms, file_id=None, bkp_path=None, overwrite
         results['LUMO'] = op.MO['virtual'][0]
     if hasattr(op, 'Dipole'):
         results['Dipole'] = op.Dipole['magnitude']
+
+    # FMO Parameters
+    if results['HOMO'] is not None and results['LUMO'] is not None:
+        results['Electronegativity'] = -0.5 * (results['LUMO'] + results['HOMO'])
+        results['Potential'] = -1 * results['Electronegativity']
+        results['Hardness'] = 0.5 * (results['LUMO'] - results['HOMO'])
+        results['Softness'] = 1 / results['Hardness']
+        results['Electrophilicity'] = (results['Potential'] ** 2) / (2 * results['Hardness'])
+        results['Nucleophilicity'] = 1 / results['Electrophilicity']
     
     # Atom Based Descriptors
     for idx, atom in label_map.items():

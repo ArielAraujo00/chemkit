@@ -1,7 +1,11 @@
-#import json, math
-#from pathlib import Path
-#from morfeus import read_xyz, Sterimol, BuriedVolume, Pyramidalization, Dispersion, SASA
+from pathlib import Path
 
+import numpy as np
+from morfeus import read_xyz, Sterimol, BuriedVolume, Pyramidalization, Dispersion, SASA
+
+from chemkit.orca.utils import dump_json, _safe_float
+
+##################################  MORFEUS  #######################################
 # Sterimol
 def get_sterimol(elements, coords, atom1, atom2, rtype='crc', encoding=None, py_index=True):
     if encoding is None:
@@ -157,46 +161,77 @@ def get_pyramidization(elements, coords, atom1, neighbors=None, rtype='pyykko',
                            radii_type=rtype, method=method, scale_factor=rscale)
 
     # Parse Output
-    output = {f'Pyramidization_{encoding}_alpha': pyr.alpha,
-              f'Pyramidization_{encoding}_P': pyr.P,
-              f'Pyramidization_{encoding}_P_angle': pyr.P_angle}
+    output = {f'Pyramidalization_{encoding}_alpha': pyr.alpha,
+              f'Pyramidalization_{encoding}_P': pyr.P,
+              f'Pyramidalization_{encoding}_P_angle': pyr.P_angle}
     
     return output
 
-def dump_json(path, data):
-    path = Path(path)
-    with path.open("w") as f:
-        json.dump(data, f, indent=2)
+##################################  GEOMETRIC  #######################################
+# dont recall why i made that for lol
+def vector_array_wrapper(func):
+    def wrapper(*args, **kwargs):
+        new_args = [np.array(arg) for arg in args]
+        return func(*new_args, **kwargs)
+    return wrapper
 
-def load_json(path):
-    path = Path(path)
-    with path.open("r") as f:
-        return json.load(f)
+@vector_array_wrapper
+def normalize_vector(v):
+    return v / np.linalg.norm(v)
 
-def safe_float(x):
-    try:
-        x = float(x)
-        return x if math.isfinite(x) else None
-    except Exception:
-        return None
+@vector_array_wrapper
+def line_vector(p1, p2):
+    return p2 - p1
 
-def load_json_dataframe(path):
-    rows = {}
-    for json_file in Path(path).glob('*.json'):
-        with json_file.open() as f:
-            rows[json_file.stem] = json.load(f)
+@vector_array_wrapper
+def plane_normal(p1, p2, p3):
+    v1 = line_vector(p1, p2)
+    v2 = line_vector(p1, p3)
+    return np.cross(v1, v2)
 
-    return pd.DataFrame.from_dict(rows, orient="index")
+@vector_array_wrapper
+def distance(p1, p2):
+    return np.linalg.norm(p2 - p1)
+
+@vector_array_wrapper
+def angle(p1, p2, p3):
+    v1 = line_vector(p1, p2)
+    v2 = line_vector(p3, p2)
+    dot = np.dot(v1, v2)
+    norm_prod = np.linalg.norm(v1) * np.linalg.norm(v2)
+    cos_theta = np.clip(dot / norm_prod, -1.0, 1.0)
+    return np.degrees(np.arccos(cos_theta))
+
+@vector_array_wrapper
+def dihedral(p1, p2, p3, p4):
+    b0 = -line_vector(p1, p2)
+    b1 = line_vector(p2, p3)
+    b2 = line_vector(p3, p4)
+    b1_unit = normalize_vector(b1)
+    v = np.cross(b0, b1_unit)
+    w = np.cross(b2, b1_unit)
+    x = np.dot(v, w)
+    y = np.dot(np.cross(v, w), b1_unit)
+    return np.degrees(np.arctan2(y, x))
+
+##################################  WRAPPER #######################################
 
 def morfeus_wrapper(xyz_path, core_atoms, file_id=None, bkp_path=None, overwrite_bkp=False):
     amide_reference = '[#7X3]([#1,#6])([#1,#6])[#6X3](=[#8X1])[#6]'  # Amide SMARTS // Amide Chemspace Project
-    smarts_idx = {'N': 0, 'C': 3, 'O': 4, 'R1': 5, 'R2': 1, 'R3': 2}  # Amide atom index from SMARTS != core_idx
-    core_bonds = [(0, 1), (0, 2), (0, 3), (3, 4), (3, 5)]  # Amide main bonds 
+    smarts_idx = {'N': 0, 'C': 3, 'O': 4, 'R1': 5, 'R2': 1, 'R3': 2}  # Amide atom index from SMARTS != core_atoms
+    core_bonds = [(0, 1), (0, 2), (0, 3), (3, 4), (3, 5)]  # Amide main bonds
+    core_angls = [(0, 3, 4), (4, 3, 5), (5, 3, 0), (1, 0, 3), (3, 0, 2), (2, 0, 1)] # Amide main angles
+    core_dihed = [(5, 3, 0, 1), (5, 3, 0, 2), (4, 3, 0, 1), (4, 3, 0, 2)] # Amide main dihedrals
 
-    # main mapper -> core atoms and its respective labels
+    # main mappers -> core atoms and its respective labels
     label_map = {core_atoms[v]: k for k, v in smarts_idx.items()}
     bonds_idx = [(core_atoms[a1], core_atoms[a2]) for a1, a2 in core_bonds]
     bonds_map = {f'{label_map[a1]}_{label_map[a2]}': (a1, a2) for a1, a2 in bonds_idx}
+    angls_idx = [(core_atoms[a1], core_atoms[a2], core_atoms[a3]) for a1, a2, a3 in core_angls]
+    angls_map = {f'{label_map[a1]}_{label_map[a2]}_{label_map[a3]}': (a1, a2, a3) for a1, a2, a3 in angls_idx}
+    dihed_idx = [(core_atoms[a1], core_atoms[a2], core_atoms[a3], core_atoms[a4]) for a1, a2, a3, a4 in core_dihed]
+    dihed_map = {f'{label_map[a1]}_{label_map[a2]}_{label_map[a3]}_{label_map[a4]}': (a1, a2, a3, a4) for a1, a2, a3, a4 in dihed_idx}
+    
 
     # Start parser and main variables ###### rename latter
     if file_id is None:
@@ -232,8 +267,16 @@ def morfeus_wrapper(xyz_path, core_atoms, file_id=None, bkp_path=None, overwrite
     results.update(get_dispersion(elements, coords, atoms=label_map.keys(), encoding=label_map.values()))
     
     ### Pyramidization: Only N
-    results.update(get_pyramidization(elements, coords, core_idx[0], encoding='N'))
+    results.update(get_pyramidization(elements, coords, core_atoms[0], encoding='N'))
 
+    ### Geometric Descriptors
+    for dist, (a1, a2) in bonds_map.items():
+        results[f'Distance_{dist}'] = distance(coords[a1], coords[a2])
+    for angl, (a1, a2, a3) in angls_map.items():
+        results[f'Angle_{angl}'] = angle(coords[a1], coords[a2], coords[a3])
+    for dhed, (a1, a2, a3, a4) in dihed_map.items():
+        results[f'Dihedral_{dhed}'] = dihedral(coords[a1], coords[a2], coords[a3], coords[a4])
+    
     # Save and exit
-    results = {k: safe_float(v) for k, v in results.items()}
+    results = {k: _safe_float(v) for k, v in results.items()}
     dump_json(bkp_path, results)
