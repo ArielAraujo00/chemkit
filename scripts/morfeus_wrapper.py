@@ -3,7 +3,8 @@ from pathlib import Path
 import numpy as np
 from morfeus import read_xyz, Sterimol, BuriedVolume, Pyramidalization, Dispersion, SASA
 
-from chemkit.orca.utils import dump_json, _safe_float
+from chemkit import core
+from chemkit.orca.utils import dump_json
 
 ##################################  MORFEUS  #######################################
 # Sterimol
@@ -278,5 +279,5 @@ def morfeus_wrapper(xyz_path, core_atoms, file_id=None, bkp_path=None, overwrite
         results[f'Dihedral_{dhed}'] = dihedral(coords[a1], coords[a2], coords[a3], coords[a4])
     
     # Save and exit
-    results = {k: _safe_float(v) for k, v in results.items()}
+    results = {k: core.safe_float(v) for k, v in results.items()}
     dump_json(bkp_path, results)

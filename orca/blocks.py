@@ -4,29 +4,30 @@ import pandas as pd
 import re
 
 # This Project
+from chemkit import core
 from . import utils
 
 # ----- orca parser blocks -----
 @utils.block(tags='FINAL SINGLE POINT ENERGY', key='SPE', multiple=True)
 def spe(lines, i=0):
     output = None
-    i, _ = utils._seek_tag(lines, spe.tags, start=i)
+    i, _ = utils.seek_tag(lines, spe.tags, start=i)
     if i is None:
         return output
     i += spe.header
-    vals = utils._extract_numbers(lines[i])
+    vals = core.extract_numbers(lines[i])
     output = vals[-1]
     return output
 
 @utils.block(tags='ORBITAL ENERGIES', key='MO', header=4, endpoint=utils._not_digit)
 def orbitals(lines, i=0):
     output = {'occupied': [], 'virtual': []}
-    i, _ = utils._seek_tag(lines, orbitals.tags, start=i)
+    i, _ = utils.seek_tag(lines, orbitals.tags, start=i)
     if i is None:
         return output
     i += orbitals.header
     while i < len(lines) and not orbitals.endpoint(lines[i]):
-        vals = utils._extract_numbers(lines[i])
+        vals = core.extract_numbers(lines[i])
         if vals[1] > 0:
             output['occupied'].append(vals[2])
         else:
@@ -38,12 +39,12 @@ def orbitals(lines, i=0):
        endpoint=utils._contains('Sum of atomic charges'))
 def mulliken(lines, i=0):
     output = []
-    i, _ = utils._seek_tag(lines, mulliken.tags, start=i)
+    i, _ = utils.seek_tag(lines, mulliken.tags, start=i)
     if i is None:
         return output
     i += mulliken.header
     while i < len(lines) and not mulliken.endpoint(lines[i]):
-        vals = utils._extract_numbers(lines[i])
+        vals = core.extract_numbers(lines[i])
         output.append(vals[-1])
         i += 1
     return output
@@ -51,12 +52,12 @@ def mulliken(lines, i=0):
 @utils.block(tags='LOEWDIN ATOMIC CHARGES', key='Loewdin', header=2, endpoint=utils._blank)
 def loewdin(lines, i=0):
     output = []
-    i, _ = utils._seek_tag(lines, loewdin.tags, start=i)
+    i, _ = utils.seek_tag(lines, loewdin.tags, start=i)
     if i is None:
         return output
     i += loewdin.header
     while i < len(lines) and not loewdin.endpoint(lines[i]):
-        vals = utils._extract_numbers(lines[i])
+        vals = core.extract_numbers(lines[i])
         output.append(vals[-1])
         i += 1
     return output
@@ -64,12 +65,12 @@ def loewdin(lines, i=0):
 @utils.block(tags='MAYER POPULATION ANALYSIS', key='Mayer', header=11, endpoint=utils._blank)
 def mayer(lines, i=0):
     output = {'total_valence': [], 'bonded_valence': [], 'free_valence': []}
-    i, _ = utils._seek_tag(lines, mayer.tags, start=i)
+    i, _ = utils.seek_tag(lines, mayer.tags, start=i)
     if i is None:
         return output
     i += mayer.header
     while i < len(lines) and not mayer.endpoint(lines[i]):
-        vals = utils._extract_numbers(lines[i])
+        vals = core.extract_numbers(lines[i])
         output['total_valence'].append(vals[-3])
         output['bonded_valence'].append(vals[-2])
         output['free_valence'].append(vals[-1])
@@ -79,12 +80,12 @@ def mayer(lines, i=0):
 @utils.block(tags='HIRSHFELD ANALYSIS', key='Hirshfeld', header=7, endpoint=utils._blank)
 def hirshfeld(lines, i=0):
     output = {'charge': [], 'spin': []}
-    i, _ = utils._seek_tag(lines, hirshfeld.tags, start=i)
+    i, _ = utils.seek_tag(lines, hirshfeld.tags, start=i)
     if i is None:
         return output
     i += hirshfeld.header
     while i < len(lines) and not hirshfeld.endpoint(lines[i]):
-        vals = utils._extract_numbers(lines[i])
+        vals = core.extract_numbers(lines[i])
         if len(vals) >= 2:
             output['charge'].append(vals[-2])
             output['spin'].append(vals[-1])
@@ -95,12 +96,12 @@ def hirshfeld(lines, i=0):
        header=6, endpoint=utils._separator)
 def npa(lines, i=0):
     output = {'charge': [], 'core': [], 'valence': [], 'rydberg': [], 'total': []}
-    i, _ = utils._seek_tag(lines, npa.tags, start=i)
+    i, _ = utils.seek_tag(lines, npa.tags, start=i)
     if i is None:
         return output
     i += npa.header
     while i < len(lines) and not npa.endpoint(lines[i]):
-        vals = utils._extract_numbers(lines[i])
+        vals = core.extract_numbers(lines[i])
         output['charge'].append(vals[-5])
         output['core'].append(vals[-4])
         output['valence'].append(vals[-3])
@@ -113,7 +114,7 @@ def npa(lines, i=0):
        endpoint=utils._contains('NBO analysis completed'))
 def nbo(lines, i=0):
     output = []
-    i, _ = utils._seek_tag(lines, nbo.tags, start=i)
+    i, _ = utils.seek_tag(lines, nbo.tags, start=i)
     if i is None:
         return output
     i += nbo.header
@@ -124,8 +125,8 @@ def nbo(lines, i=0):
             idx = int(line.strip().split('.')[0])  # orbital index
             typ = m.group('type')
             order = int(m.group('order'))
-            occ = utils._safe_float(m.group('occ'))
-            ene = utils._safe_float(m.group('E'))
+            occ = core.safe_float(m.group('occ'))
+            ene = core.safe_float(m.group('E'))
             a1 = int(m.group('a1')) -1  # Adjust for orca index
             a2 = m.group('a2')
             a2 = int(a2) -1 if a2 is not None else None  # Adjust for orca index
@@ -145,17 +146,17 @@ def nbo(lines, i=0):
 @utils.block(tags='DIPOLE MOMENT', key='Dipole', endpoint=utils._contains('Magnitude (Debye)'))
 def dipole(lines, i=0):
     output = {'vector': None, 'magnitude': None}
-    i, _ = utils._seek_tag(lines, dipole.tags, start=i)
+    i, _ = utils.seek_tag(lines, dipole.tags, start=i)
     if i is None:
         return output
     i += dipole.header
     while i < len(lines) and not dipole.endpoint(lines[i]):
         if 'Total Dipole Moment' in lines[i]:
-            vals = utils._extract_numbers(lines[i])
+            vals = core.extract_numbers(lines[i])
             if len(vals) >= 3:
                 output['vector'] = tuple(vals[:3])
         i += 1
-    vals = utils._extract_numbers(lines[i])
+    vals = core.extract_numbers(lines[i])
     if vals:
         output['magnitude'] = vals[0]
     return output
@@ -163,17 +164,17 @@ def dipole(lines, i=0):
 @utils.block(tags='Rotational spectrum', key='Rotational', endpoint=utils._contains('Rotational constants in MHz'))
 def rotational_constants(lines, i=0):
     output = {'cm-1': None, 'MHz': None}
-    i, _ = utils._seek_tag(lines, rotational_constants.tags, start=i)
+    i, _ = utils.seek_tag(lines, rotational_constants.tags, start=i)
     if i is None:
         return output
     i += rotational_constants.header
     while i < len(lines) and not rotational_constants.endpoint(lines[i]):
         if 'Rotational constants in cm-1' in lines[i]:
-            vals = utils._extract_numbers(lines[i])
+            vals = core.extract_numbers(lines[i])
             if vals:
                 output['cm-1'] = tuple(vals[1:])
         i += 1
-    vals = utils._extract_numbers(lines[i])
+    vals = core.extract_numbers(lines[i])
     if vals:
         output['MHz'] = tuple(vals)
     return output
@@ -181,18 +182,18 @@ def rotational_constants(lines, i=0):
 @utils.block(tags='VIBRATIONAL FREQUENCIES', key='Vibrational', header=5, endpoint=utils._blank)
 def ir_spectra(lines, i=0):
     output = []
-    i, _ = utils._seek_tag(lines, ir_spectra.tags, start=i)
+    i, _ = utils.seek_tag(lines, ir_spectra.tags, start=i)
     if i is None:
         return output
     i += ir_spectra.header
     while i < len(lines) and not ir_spectra.endpoint(lines[i]):
-        vals = utils._extract_numbers(lines[i])
+        vals = core.extract_numbers(lines[i])
         output.append(vals[0])
         i += 1
     return utils.parse_ir(output)
 
 @utils.block(tags='THERMOCHEMISTRY AT', key='Energies')
-def energies(lines, i=0, conv=True, const='kcal/mol'):
+def energies(lines, i=0, unit='kcal/mol'):
     output = {
         'Electronic energy': None,
         'Total thermal energy': None,
@@ -209,31 +210,31 @@ def energies(lines, i=0, conv=True, const='kcal/mol'):
         'Rotational entropy': None,
         'Translational entropy': None
     }
-    i, _ = utils._seek_tag(lines, energies.tags, start=i)
+    i, _ = utils.seek_tag(lines, energies.tags, start=i)
     if i is None:
         return output
     i += energies.header
     while i < len(lines):
         for k in output:
             if k in lines[i]:
-                vals = utils._extract_numbers(lines[i])
+                vals = core.extract_numbers(lines[i])
                 if vals:
                     output[k] = vals[0]
         i += 1
         if all(v is not None for v in output.values()):
-            return utils.parse_energies(output, conv=conv)
-    return utils.parse_energies(output, conv=conv, const=const)
+            return utils.parse_energies(output, unit=unit)
+    return utils.parse_energies(output, unit=unit)
 
 @utils.block(tags='TOTAL RUN TIME:', key='Time')
 def walltime(lines, i=0, unit='s'):
-    i, _ = utils._seek_tag(lines, walltime.tags, start=i)
+    i, _ = utils.seek_tag(lines, walltime.tags, start=i)
     if i is None:
         return None
-    d, h, m, s, ms = utils._extract_numbers(lines[i])
+    d, h, m, s, ms = core.extract_numbers(lines[i])
     time = (d * 86400 +
             h * 3600 +
             m * 60 +
             s +
             ms / 1000)
     
-    return time * utils._TIME_TO[unit]
+    return time * core._TIME_TO[unit]

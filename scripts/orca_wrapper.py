@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from chemkit.orca import OrcaParser
+from chemkit import core
 from chemkit.orca.utils import dump_json
 
 def orca_wrapper(output_path, core_atoms, file_id=None, bkp_path=None, overwrite_bkp=False):
