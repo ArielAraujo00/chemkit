@@ -4,7 +4,6 @@ import pandas as pd
 
 from chemkit.orca import OrcaParser
 from chemkit import core
-from chemkit.orca.utils import dump_json
 
 def orca_wrapper(output_path, core_atoms, file_id=None, bkp_path=None, overwrite_bkp=False):
     amide_reference = '[#7X3]([#1,#6])([#1,#6])[#6X3](=[#8X1])[#6]'  # Amide SMARTS // Amide Chemspace Project
@@ -83,4 +82,4 @@ def orca_wrapper(output_path, core_atoms, file_id=None, bkp_path=None, overwrite
             results[key + '_occ'] = row.occ
     
     # Save and exit
-    dump_json(bkp_path, results)
+    core.dump_json(bkp_path, results)

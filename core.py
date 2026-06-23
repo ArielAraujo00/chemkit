@@ -3,6 +3,8 @@ import re
 import json
 from pathlib import Path
 
+import numpy as np
+
 # --------------- constants --------------- #
 _EH_TO = {'kcal/mol': 627.50961,
           'kJ/mol': 2625.5002,
@@ -16,6 +18,45 @@ _TIME_TO = {'s': 1,
             'h': 1/3600,
             'd': 1/86400}
 
+_ALPHABET_LC = 'abcdefghijklmnopqrstuvwxyz'
+
+_ALPHABET_UC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+_SUPER_MAP = str.maketrans({
+    'A':'ᴬ', 'B':'ᴮ', 'C':'ᶜ', 'D':'ᴰ', 'E':'ᴱ', 'F':'ᶠ', 'G':'ᴳ',
+    'H':'ᴴ', 'I':'ᴵ', 'J':'ᴶ', 'K':'ᴷ', 'L':'ᴸ', 'M':'ᴹ', 'N':'ᴺ',
+    'O':'ᴼ', 'P':'ᴾ', 'Q':'Q', 'R':'ᴿ', 'S':'ˢ', 'T':'ᵀ', 'U':'ᵁ',
+    'V':'ⱽ', 'W':'ᵂ', 'X':'ˣ', 'Y':'ʸ', 'Z':'ᶻ',
+
+    'a':'ᵃ', 'b':'ᵇ', 'c':'ᶜ', 'd':'ᵈ', 'e':'ᵉ', 'f':'ᶠ', 'g':'ᵍ',
+    'h':'ʰ', 'i':'ᶦ', 'j':'ʲ', 'k':'ᵏ', 'l':'ˡ', 'm':'ᵐ', 'n':'ⁿ',
+    'o':'ᵒ', 'p':'ᵖ', 'q':'۹', 'r':'ʳ', 's':'ˢ', 't':'ᵗ', 'u':'ᵘ',
+    'v':'ᵛ', 'w':'ʷ', 'x':'ˣ', 'y':'ʸ', 'z':'ᶻ',
+
+    '0':'⁰', '1':'¹', '2':'²', '3':'³', '4':'⁴',
+    '5':'⁵', '6':'⁶', '7':'⁷', '8':'⁸', '9':'⁹',
+
+    '+':'⁺', '-':'⁻', '=':'⁼', '(':'⁽', ')':'⁾'
+})
+
+
+_SUB_MAP = str.maketrans({
+    'A':'ₐ', 'B':'₈', 'C':'C', 'D':'D', 'E':'ₑ', 'F':'բ', 'G':'G',
+    'H':'ₕ', 'I':'ᵢ', 'J':'ⱼ', 'K':'ₖ', 'L':'ₗ', 'M':'ₘ', 'N':'ₙ',
+    'O':'ₒ', 'P':'ₚ', 'Q':'Q', 'R':'ᵣ', 'S':'ₛ', 'T':'ₜ', 'U':'ᵤ',
+    'V':'ᵥ', 'W':'w', 'X':'ₓ', 'Y':'ᵧ', 'Z':'Z',
+
+    'a':'ₐ', 'b':'♭', 'c':'꜀', 'd':'ᑯ', 'e':'ₑ', 'f':'բ', 'g':'₉',
+    'h':'ₕ', 'i':'ᵢ', 'j':'ⱼ', 'k':'ₖ', 'l':'ₗ', 'm':'ₘ', 'n':'ₙ',
+    'o':'ₒ', 'p':'ₚ', 'q':'૧', 'r':'ᵣ', 's':'ₛ', 't':'ₜ', 'u':'ᵤ',
+    'v':'ᵥ', 'w':'w', 'x':'ₓ', 'y':'ᵧ', 'z':'₂',
+
+    '0':'₀', '1':'₁', '2':'₂', '3':'₃', '4':'₄',
+    '5':'₅', '6':'₆', '7':'₇', '8':'₈', '9':'₉',
+
+    '+':'₊', '-':'₋', '=':'₌', '(':'₍', ')':'₎'
+})
+
 # --------------- regex patterns --------------- #
 _INT_RE   = re.compile(r'[+-]?\d+')
 
@@ -24,7 +65,6 @@ _FLOAT_RE = re.compile(r'[+-]?\d+\.\d+')
 _SCY_RE   = re.compile(r'[+-]?\d*\.\d+[Ee][+-]?\d+')
 
 _NUMBER_RE = re.compile(f'{_SCY_RE.pattern}|{_FLOAT_RE.pattern}|{_INT_RE.pattern}')
-
 
 # --------------- main helpers --------------- #
 def parse_path(file_path):
@@ -62,6 +102,49 @@ def safe_int(number):
     except (ValueError, TypeError):
         return None
 
+def align_xy(X, y):
+    X = np.asarray(X)
+    y = np.asarray(y).ravel()
+    if X.ndim == 1:
+        X = X.reshape(-1, 1)
+    mask = (np.isfinite(y) & np.isfinite(X).all(axis=1))
+    X = X[mask]
+    y = y[mask]
+    if len(y) == 0:
+        raise ValueError('No finite samples remain after alignment.')
+    return X, y
+
+# --------------- text helpers --------------- #
+def rename(name: str | list[str], sep: str | None = '_',
+           prefix: str | None = None, suffix: str | None = None):
+    
+    sep = '' if sep is None else sep
+    def _rename(x):
+        if suffix is not None:
+            x += f'{sep}{suffix}'
+        if prefix is not None:
+            x = f'{prefix}{sep}{x}'
+        return x
+    
+    if isinstance(name, str):
+        return _rename(name)
+    return [_rename(x) for x in name]
+
+def lett_encode(n: int):
+    label = ''
+    while True:
+        n, rem = divmod(n, 26)
+        label = chr(65 + rem) + label
+        if n == 0:
+            break
+        n -= 1
+    return label
+    
+def superscript(text: str):
+    return str(text).translate(_SUPER_MAP)
+
+def subscript(text: str):
+    return str(text).translate(_SUB_MAP)
 
 # --------------- data storage --------------- #
 def dump_json(path, data):
@@ -83,25 +166,26 @@ def load_descriptor_dataframe(path):
             yield data
     return pd.DataFrame(_rows()).set_index('__index__')
 
+
+# --------------- generators --------------- #
+def iter_shermo(lines):
+    block = []
+    for line in lines:
+        if line.startswith('====='):
+            if block:
+                yield block
+                block = []
+        block.append(line.strip())
+    if block:
+        yield block
+
+
 # --------------- refactor latter --------------- #
 """
 import os, shutil, glob
 from decimal import Decimal
 
 ################################################################################ Text editing
-# function to convert to superscript
-def super_script(string):
-    normal = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-=()"
-    super_s = "ᴬᴮᶜᴰᴱᶠᴳᴴᴵᴶᴷᴸᴹᴺᴼᴾQᴿˢᵀᵁⱽᵂˣʸᶻᵃᵇᶜᵈᵉᶠᵍʰᶦʲᵏˡᵐⁿᵒᵖ۹ʳˢᵗᵘᵛʷˣʸᶻ⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾"
-    res = string.maketrans(''.join(normal), ''.join(super_s))
-    return string.translate(res)
-
-# function to convert to subscript
-def sub_script(string):
-    normal = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-=()"
-    sub_s = "ₐ₈CDₑբGₕᵢⱼₖₗₘₙₒₚQᵣₛₜᵤᵥwₓᵧZₐ♭꜀ᑯₑբ₉ₕᵢⱼₖₗₘₙₒₚ૧ᵣₛₜᵤᵥwₓᵧ₂₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎"
-    res = string.maketrans(''.join(normal), ''.join(sub_s))
-    return string.translate(res)
 
 # function to format the xyz line upon file conversion
 def format_xyz(atom, coord, decimal=5):
@@ -133,54 +217,7 @@ def format_range(start, end, step=1):
         current += step
     return out
 
-################################################################################ File & System
 
-# function to retrieve files and/or directories paths from a given root
-def get_main(path, select):
-    assert select in ['dirs', 'files', 'all'], "select must be: \'dirs\', \'files\' or \'all\'"
-    for root, dirs, files in os.walk(path):
-        if root == path:
-            if select == 'dirs':
-                return [os.path.join(root, d) for d in dirs]
-            if select == 'files':
-                return [os.path.join(root, f) for f in files]
-            if select == 'all':
-                return [os.path.join(root, i) for i in os.listdir(root)]
-
-# function to retrieve files and/or directories that match a given pattern string
-def glob_files(path, pattern, select='all'):
-    if select == 'all': # loop through all inner dirs and files of a root
-        output = list()
-        for root, dirs, files in os.walk(path):
-            path_pattern = os.path.join(root, pattern)
-            output.extend(glob.glob(path_pattern))
-        return output
-    elif select == 'root': # only the root path
-        path_pattern = os.path.join(root, pattern)
-        return glob.glob(path_pattern)
-
-# makes sure the path exists and creates/clears it when don't
-def secure_path(path, clear=False):
-    if not os.path.exists(path):
-        os.makedirs(path)
-    elif os.path.exists(path) and clear:
-        shutil.rmtree(path)
-        os.makedirs(path)
-    else:
-        while True:
-            ans = input(f'<{path}> already exists, do you want to overwirte? [y/n]')
-            if ans == 'y':
-                shutil.rmtree(path)
-                os.makedirs(path)
-                break
-            elif ans == 'n':
-                break
-            else:
-                print('Wrong input')
-
-# extracts only file name from path string (removes extension)
-def get_name(path):
-    return os.path.splitext(os.path.split(path)[1])[0]
 
 ################################################################################ OTHERS
 def energy_from_xyz(path):
